@@ -741,7 +741,7 @@ class View(discord.ui.View):
             embeds.append(embed)
             total_pages += 1
 
-        self.home.set_footer(text="by ZENOX")
+        self.home.set_footer(text="A project by ZENOX")
         return options, embeds, total_pages
 
     def _append_cmd_lines(self, text: str, emoji_display: str, lines: list[str]):
@@ -802,7 +802,7 @@ class View(discord.ui.View):
         if not self.index + page < 0 or not self.index + page > len(self.options):
             await self.set_index(page)
             embed = self.embeds[self.index]
-            embed.set_footer(text="by ZENOX")
+            embed.set_footer(text="A project by ZENOX")
             await interaction.response.edit_message(embed=embed, view=self)
 
     async def set_page(self, page: int, interaction: discord.Interaction):

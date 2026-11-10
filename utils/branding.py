@@ -49,6 +49,12 @@ def _setup_branding_db():
             activity_name TEXT
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS bot_status (
+            id     INTEGER PRIMARY KEY CHECK (id = 0),
+            status TEXT NOT NULL
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -331,6 +337,36 @@ async def clear_custom_activity():
     """Clear the persisted custom activity so the rotating status resumes."""
     async with aiosqlite.connect('db/branding.db') as db:
         await db.execute("DELETE FROM bot_activity WHERE id = 0")
+        await db.commit()
+
+
+async def get_custom_status() -> discord.Status | None:
+    """Return the saved global bot status, or None when no status was selected."""
+    status_map = {
+        "online": discord.Status.online,
+        "idle": discord.Status.idle,
+        "dnd": discord.Status.do_not_disturb,
+        "invisible": discord.Status.invisible,
+    }
+    async with aiosqlite.connect('db/branding.db') as db:
+        async with db.execute(
+            "SELECT status FROM bot_status WHERE id = 0"
+        ) as cursor:
+            row = await cursor.fetchone()
+    return status_map.get(row[0]) if row else None
+
+
+async def set_custom_status(status: str):
+    """Persist a selected global bot status so it survives restarts."""
+    valid_statuses = {"online", "idle", "dnd", "invisible"}
+    normalized = status.lower().strip()
+    if normalized not in valid_statuses:
+        raise ValueError(f"Unsupported bot status: {status}")
+    async with aiosqlite.connect('db/branding.db') as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO bot_status (id, status) VALUES (0, ?)",
+            (normalized,),
+        )
         await db.commit()
 
 

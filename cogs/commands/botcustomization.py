@@ -627,7 +627,11 @@ class GlobalActivityModal(discord.ui.Modal, title="Set Bot Activity"):
             return
         name = self.activity_name.value.strip()
         activity = discord.Activity(type=atype, name=name)
-        await interaction.client.change_presence(activity=activity)
+        interaction.client.current_activity = activity
+        await interaction.client.change_presence(
+            activity=activity,
+            status=getattr(interaction.client, "bot_status", discord.Status.do_not_disturb),
+        )
         # Persist so the activity survives restarts and overrides the rotating task
         from utils.branding import set_custom_activity
         await set_custom_activity(self.activity_type.value.lower().strip(), name)
@@ -796,7 +800,13 @@ class GlobalBotProfileView(discord.ui.View):
         }
         chosen = select.values[0]
         status = status_map[chosen]
-        await interaction.client.change_presence(status=status)
+        from utils.branding import set_custom_status
+        await set_custom_status(chosen)
+        interaction.client.bot_status = status
+        await interaction.client.change_presence(
+            status=status,
+            activity=getattr(interaction.client, "current_activity", None),
+        )
         self.status_text = chosen.capitalize()
         embed = self.build_embed()
         await interaction.response.edit_message(embed=embed, view=self)
@@ -807,8 +817,12 @@ class GlobalBotProfileView(discord.ui.View):
         from utils.branding import clear_custom_activity
         await clear_custom_activity()
         interaction.client.use_custom_activity = False
+        interaction.client.current_activity = None
         self.activity_text = "Not set (rotating status resumed)"
-        await interaction.client.change_presence(activity=None)
+        await interaction.client.change_presence(
+            activity=None,
+            status=getattr(interaction.client, "bot_status", discord.Status.do_not_disturb),
+        )
         embed = self.build_embed()
         await interaction.response.edit_message(embed=embed, view=self)
 

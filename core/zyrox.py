@@ -40,6 +40,8 @@ class zyrox(commands.AutoShardedBot):
                          shard_count=1)
         self.status_index = 0
         self.status_list = []
+        self.bot_status = discord.Status.do_not_disturb
+        self.current_activity = None
         # When True the rotating status task will not override the custom activity
         self.use_custom_activity = False
 
@@ -58,6 +60,7 @@ class zyrox(commands.AutoShardedBot):
             set_global_branding,
             get_custom_activity,
             set_custom_activity,
+            get_custom_status,
         )
 
         global_branding = await get_global_branding()
@@ -72,6 +75,10 @@ class zyrox(commands.AutoShardedBot):
         if not await get_custom_activity():
             await set_custom_activity(self.DEFAULT_ACTIVITY_TYPE, self.DEFAULT_ACTIVITY_NAME)
 
+        saved_status = await get_custom_status()
+        if saved_status:
+            self.bot_status = saved_status
+
     async def setup_hook(self):
         await self.load_extensions()
         await self._seed_default_customization()
@@ -81,9 +88,7 @@ class zyrox(commands.AutoShardedBot):
         saved = await get_custom_activity()
         if saved:
             self.use_custom_activity = True
-            await self.change_presence(
-                activity=discord.Activity(type=saved["type"], name=saved["name"])
-            )
+            self.current_activity = discord.Activity(type=saved["type"], name=saved["name"])
         self.status_task.start()
         self.tree.on_error = self.on_app_command_error
 
@@ -116,6 +121,7 @@ class zyrox(commands.AutoShardedBot):
     @tasks.loop(seconds=30)
     async def status_task(self):
         await self.wait_until_ready()
+        await self.change_presence(activity=self.current_activity, status=self.bot_status)
         if not self.guilds:
             return
         # Don't override a custom activity set via /global_customization
@@ -133,7 +139,8 @@ class zyrox(commands.AutoShardedBot):
         ]
 
         current = self.status_list[self.status_index % len(self.status_list)]
-        await self.change_presence(activity=discord.Activity(type=current[0], name=current[1]))
+        self.current_activity = discord.Activity(type=current[0], name=current[1])
+        await self.change_presence(activity=self.current_activity, status=self.bot_status)
         self.status_index += 1
 
     async def send_raw(self, channel_id: int, content: str, **kwargs) -> typing.Optional[discord.Message]:

@@ -461,6 +461,32 @@ class ExistingPanelSelect(discord.ui.Select):
         self.panel_view.stop()
 
 
+class PanelChannelSelect(discord.ui.ChannelSelect):
+    def __init__(self, setup_view):
+        self.setup_view = setup_view
+        super().__init__(
+            placeholder="Choose where the ticket panel will be posted",
+            channel_types=[discord.ChannelType.text],
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(self, inter: discord.Interaction):
+        self.setup_view.panel_channel = self.values[0]
+        self.setup_view.message = inter.message
+        await inter.response.edit_message(
+            content=None,
+            embed=self.setup_view._preview_embed(),
+            view=self.setup_view,
+        )
+
+
+class PanelChannelSelectView(discord.ui.View):
+    def __init__(self, setup_view):
+        super().__init__(timeout=120)
+        self.add_item(PanelChannelSelect(setup_view))
+
+
 # ── Step 1: Panel embed + staff role ─────────────────────────────────────────
 
 class PanelEmbedSetupView(discord.ui.View):
@@ -496,6 +522,8 @@ class PanelEmbedSetupView(discord.ui.View):
             embed.set_image(url=self.embed_banner)
         if self.embed_thumbnail:
             embed.set_thumbnail(url=self.embed_thumbnail)
+        panel_channel = self.panel_channel.mention if self.panel_channel else "Not selected"
+        embed.add_field(name="Panel Channel", value=panel_channel, inline=False)
         staff_val = f"<@&{self.staff_role_id}>" if self.staff_role_id else "*Not set — any `manage_channels` user can manage tickets*"
         embed.add_field(name=f"{_e('headmod')} Staff Role", value=staff_val, inline=False)
         embed.set_footer(text="Use the buttons below to configure, then click Next Step.")
@@ -566,8 +594,20 @@ class PanelEmbedSetupView(discord.ui.View):
                 except Exception:
                     pass
 
-    @discord.ui.button(label="Next Step ➜", style=discord.ButtonStyle.success, emoji=_e("zArrow") or "➡️", row=3)
+    @discord.ui.button(label="Select Panel Channel", style=discord.ButtonStyle.secondary, row=3)
+    async def btn_panel_channel(self, inter: discord.Interaction, btn: discord.ui.Button):
+        await inter.response.edit_message(
+            content="Choose the channel where this ticket panel should be posted:",
+            embed=None,
+            view=PanelChannelSelectView(self),
+        )
+
+    @discord.ui.button(label="Next Step ➜", style=discord.ButtonStyle.success, emoji=_e("zArrow") or "➡️", row=4)
     async def btn_next(self, inter: discord.Interaction, btn: discord.ui.Button):
+        if self.panel_channel is None:
+            return await inter.response.send_message(
+                f"{_e('zcross')} Select a panel channel before continuing.", ephemeral=True
+            )
         await inter.response.defer()
         for item in self.children:
             item.disabled = True
@@ -1387,6 +1427,14 @@ class TicketCog(commands.Cog, name="Ticket System"):
                 await self._create_ticket_flow(inter, cat_id)
             except Exception as exc:
                 print(f"[Ticket] create_ticket_flow error: {exc}")
+                try:
+                    message = f"{_e('zcross')} I couldn't finish creating your ticket. Please contact the server staff."
+                    if inter.response.is_done():
+                        await inter.followup.send(message, ephemeral=True)
+                    else:
+                        await inter.response.send_message(message, ephemeral=True)
+                except discord.HTTPException:
+                    pass
 
     async def _create_ticket_flow(self, inter: discord.Interaction, cat_id: int):
         await inter.response.defer(ephemeral=True)
@@ -1477,11 +1525,21 @@ class TicketCog(commands.Cog, name="Ticket System"):
         if staff_role:
             pings.append(staff_role.mention)
 
-        await ch.send(
-            content=" ".join(pings),
-            embed=ticket_embed,
-            view=TicketActionsView(self)
-        )
+        try:
+            await ch.send(
+                content=" ".join(pings),
+                embed=ticket_embed,
+                view=TicketActionsView(self)
+            )
+        except discord.HTTPException as exc:
+            print(f"[Ticket] Could not send configured ticket embed: {exc}")
+            await ch.send(
+                content=(
+                    f"{' '.join(pings)}\n"
+                    f"Your **{cat_info['name']}** ticket is open. Please describe your issue here."
+                ),
+                view=TicketActionsView(self),
+            )
         await inter.followup.send(
             f"{_e('ztick')} Your ticket has been created: {ch.mention}", ephemeral=True
         )
@@ -1500,9 +1558,8 @@ class TicketCog(commands.Cog, name="Ticket System"):
 
     @ticket.command(name="setup", description="Set up the ticket panel for this server.")
     @commands.has_permissions(manage_guild=True)
-    @app_commands.describe(channel="The channel where the ticket panel embed will be posted.")
-    async def setup(self, ctx, channel: discord.TextChannel):
-        view = SetupLandingView(self, ctx, channel)
+    async def setup(self, ctx):
+        view = SetupLandingView(self, ctx, None)
         if ctx.interaction:
             await view.start_slash(ctx.interaction)
         else:
