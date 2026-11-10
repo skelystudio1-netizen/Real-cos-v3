@@ -1426,7 +1426,7 @@ class TicketCog(commands.Cog, name="Ticket System"):
                 cat_id = int(cid.removeprefix("create_ticket_"))
                 await self._create_ticket_flow(inter, cat_id)
             except Exception as exc:
-                print(f"[Ticket] create_ticket_flow error: {exc}")
+                print(f"[Ticket] create_ticket_flow error: {exc!r}")
                 try:
                     message = f"{_e('zcross')} I couldn't finish creating your ticket. Please contact the server staff."
                     if inter.response.is_done():
@@ -1510,36 +1510,38 @@ class TicketCog(commands.Cog, name="Ticket System"):
         embed_banner = cat_info["cat_embed_banner"]
         embed_thumb  = cat_info["cat_embed_thumbnail"]
 
-        ticket_embed = discord.Embed(
-            title=embed_title, description=embed_desc, color=EMBED_COLOR
-        )
-        ticket_embed.set_author(
-            name=user.display_name, icon_url=user.display_avatar.url
-        )
-        if embed_banner:
-            ticket_embed.set_image(url=embed_banner)
-        if embed_thumb:
-            ticket_embed.set_thumbnail(url=embed_thumb)
-
         pings = [user.mention]
         if staff_role:
             pings.append(staff_role.mention)
 
         try:
+            ticket_embed = discord.Embed(
+                title=embed_title, description=embed_desc, color=EMBED_COLOR
+            )
+            ticket_embed.set_author(
+                name=user.display_name, icon_url=user.display_avatar.url
+            )
+            if embed_banner:
+                ticket_embed.set_image(url=embed_banner)
+            if embed_thumb:
+                ticket_embed.set_thumbnail(url=embed_thumb)
             await ch.send(
                 content=" ".join(pings),
                 embed=ticket_embed,
                 view=TicketActionsView(self)
             )
-        except discord.HTTPException as exc:
-            print(f"[Ticket] Could not send configured ticket embed: {exc}")
-            await ch.send(
+        except Exception as exc:
+            print(f"[Ticket] Could not send configured ticket message: {exc!r}")
+            initial_message = await ch.send(
                 content=(
                     f"{' '.join(pings)}\n"
                     f"Your **{cat_info['name']}** ticket is open. Please describe your issue here."
-                ),
-                view=TicketActionsView(self),
+                )
             )
+            try:
+                await initial_message.edit(view=TicketActionsView(self))
+            except Exception as view_exc:
+                print(f"[Ticket] Could not attach ticket controls: {view_exc!r}")
         await inter.followup.send(
             f"{_e('ztick')} Your ticket has been created: {ch.mention}", ephemeral=True
         )
