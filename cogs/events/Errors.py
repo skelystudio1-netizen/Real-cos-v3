@@ -41,6 +41,23 @@ def _slash_alternative_hint(ctx: Context) -> str:
         return ""
 
 
+def _command_usage(ctx: Context) -> str:
+    """Build usage text without repeating the command name from explicit usage."""
+    command = ctx.command
+    usage = (command.usage or command.signature or "").strip()
+    names = (command.qualified_name, command.name)
+
+    for name in names:
+      if usage.casefold().startswith(name.casefold()):
+        remainder = usage[len(name):]
+        if not remainder or remainder[0].isspace():
+          usage = remainder.strip()
+          break
+
+    signature = f" {usage}" if usage else ""
+    return f"`{ctx.prefix or '>'}{command.qualified_name}{signature}`"
+
+
 class Errors(Cog):
   def __init__(self, client: zyrox):
     self.client = client
@@ -56,19 +73,14 @@ class Errors(Cog):
 
     if isinstance(error, commands.MissingRequiredArgument):
       prefix = ctx.prefix or ">"
-      usage = f"`{prefix}{ctx.command.qualified_name}"
-      if ctx.command.usage:
-          usage += f" {ctx.command.usage}"
-      else:
-          usage += f" {ctx.command.signature}"
-      usage += "`"
+      usage = _command_usage(ctx)
       hint = _friendly_type_hint(error.param)
       embed = discord.Embed(
           color=0xFF0000,
           description=(
               f"{_e('zcross')} **You're missing something:** `{error.param.name}`\n\n"
               f"**What to do:** {hint}.\n\n"
-              f"**How to use:** {usage}"
+              f"**Use:** {usage}"
               f"{_slash_alternative_hint(ctx)}"
           ),
       )
@@ -110,13 +122,10 @@ class Errors(Cog):
 
     if isinstance(error, commands.TooManyArguments):
       prefix = ctx.prefix or ">"
-      usage = f"`{prefix}{ctx.command.qualified_name}"
-      if ctx.command.usage:
-          usage += f" {ctx.command.usage}"
-      usage += "`"
+      usage = _command_usage(ctx)
       embed = discord.Embed(
           color=0xFF0000,
-          description=f"{_e('zcross')} **Too many arguments.**\n\n**How to use:** {usage}{_slash_alternative_hint(ctx)}",
+          description=f"{_e('zcross')} **Too many arguments.**\n\n**Use:** {usage}{_slash_alternative_hint(ctx)}",
       )
       embed.set_author(name="Wrong Usage", icon_url=ctx.bot.user.display_avatar.url)
       embed.set_footer(text=f"Tip: type {prefix}help {ctx.command.qualified_name} for full info")
@@ -154,13 +163,10 @@ class Errors(Cog):
 
     if isinstance(error, commands.BadArgument):
       prefix = ctx.prefix or ">"
-      usage = f"`{prefix}{ctx.command.qualified_name}"
-      if ctx.command.usage:
-          usage += f" {ctx.command.usage}"
-      usage += "`"
+      usage = _command_usage(ctx)
       embed = discord.Embed(
           color=0xFF0000,
-          description=f"{_e('zcross')} **Invalid argument:** {error}\n\n**How to use:** {usage}{_slash_alternative_hint(ctx)}",
+          description=f"{_e('zcross')} **Invalid argument:** {error}\n\n**Use:** {usage}{_slash_alternative_hint(ctx)}",
       )
       embed.set_author(name="Wrong Usage", icon_url=ctx.bot.user.display_avatar.url)
       embed.set_footer(text=f"Tip: type {prefix}help {ctx.command.qualified_name} for full info")

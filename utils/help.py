@@ -8,6 +8,54 @@ from utils.branding import DEFAULT_COLOR, DEFAULT_BRANDING, apply_branding_thumb
 from utils.emojis import e as _e
 
 
+_FEATURE_PAGE_LABELS = {
+    "automod": "Automod Commands",
+    "antinuke": "Security Commands",
+    "security": "Security Commands",
+    "verification": "Verification Commands",
+    "encrypting": "Encryption Commands",
+    "encryption": "Encryption Commands",
+    "moderation": "Moderation Commands",
+    "ticket": "Ticket",
+    "welcomer": "Welcomer Commands",
+    "giveaway": "Giveaway Commands",
+    "logging": "Logging Commands",
+    "voice": "Voice Commands",
+    "ignoring": "Ignore Commands",
+    "ignore": "Ignore Commands",
+    "utility": "Utility Commands",
+    "general": "General Commands",
+    "server": "Server Commands",
+    "vanity": "Vanity",
+    "reactionroles": "Reaction Roles",
+    "music": "Music Commands",
+    "playlist": "Music Commands",
+    "fun": "Fun Commands",
+    "birthday": "Birthday Commands",
+    "minecraft": "Minecraft Commands",
+    "j2c": "J2C",
+    "leveling": "Leveling Commands",
+    "invitetracker": "Invite Tracker",
+    "poll": "Poll Commands",
+    "boost": "Boost Commands",
+    "boostmessage": "Boost Commands",
+    "boostmassage": "Boost Commands",
+    "counting": "Counting",
+    "sticky": "Sticky Commands",
+    "joindm": "Joindm",
+    "botcustomization": "Bot Customization",
+    "exclusive": "Bot Customization",
+}
+
+
+def _normalize_feature_keyword(keyword: str) -> str:
+    return re.sub(r"[\s_-]+", "", keyword).casefold()
+
+
+def is_feature_keyword(keyword: str) -> bool:
+    return _normalize_feature_keyword(keyword) in _FEATURE_PAGE_LABELS
+
+
 def _is_noop_bare_group(cmd_obj) -> bool:
     """True if cmd_obj is a Group whose own body does nothing but redirect
     to help when invoked without a subcommand (e.g. `>ticket`, `>media`
@@ -369,6 +417,22 @@ class View(discord.ui.View):
         else:
             self.buttons = self.add_buttons()
             self.add_item(Dropdown(ctx=self.ctx, options=self.options))
+
+    def find_feature_page(self, keyword: str) -> int:
+        target_label = _FEATURE_PAGE_LABELS.get(_normalize_feature_keyword(keyword))
+        if target_label is None:
+            return 0
+        return next(
+            (index for index, option in enumerate(self.options)
+             if option.label.casefold() == target_label.casefold()),
+            0,
+        )
+
+    def set_initial_page(self, page: int):
+        self.index = max(0, min(page, len(self.embeds) - 1))
+        self.current_page = self.index
+        if self.index:
+            self._refresh_cmd_runner(self.index)
 
     # ── Buttons ────────────────────────────────────────────────────────────────
 

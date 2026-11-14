@@ -414,7 +414,7 @@ class JoinToCreate(commands.Cog):
                 return
 
             vc = await member.guild.create_voice_channel(
-                f"{member.name}'s VC",
+                f"{member.display_name}'s VC",
                 category=category,
                 reason="Private VC Creation",
                 user_limit=99

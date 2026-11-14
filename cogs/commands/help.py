@@ -20,6 +20,78 @@ from utils.emojis import e as _e
 color = DEFAULT_COLOR
 client = zyrox()
 
+
+def _build_help_home_embed(branding, author):
+  b_name = branding["branding_name"]
+  b_color = branding["embed_color"]
+  embed = discord.Embed(
+      description=(
+          f"```Hey! I'm {b_name}, your own best companion. "
+          "The only bot you need to set up your entire server!```\n"
+          "• Prefix: ``>``, ``sun``\n"
+          "• Total Commands: ``586``\n"
+          "\n"
+          "**✦ EXPLORE BOT FEATURES ✦**"
+      ),
+      color=b_color
+  )
+
+  apply_branding_thumbnail(embed, branding, author)
+  if branding.get("embed_banner"):
+      embed.set_image(url=branding["embed_banner"])
+
+  embed.add_field(
+      name=f"{_e('zSafe')} __Security__",
+      value=">>> ★ Automod • Antinuke • Verification • Encrypting",
+      inline=False
+  )
+  embed.add_field(
+      name=f"{_e('zbot')} __Mkderation__",
+      value=">>> ★ Moderation • Ticket | Welcomer • Giveaway • Logging • Voice • Ignoring",
+      inline=False
+  )
+  embed.add_field(
+      name=f"{_e('zwrench')} __Utility__",
+      value=">>> ★ Utility • General • Server • Vanity • Reaction Roles • Giveaway • Boost Massage",
+      inline=False
+  )
+  embed.add_field(
+      name=f"{_e('starr')} __Music & Fun__",
+      value=">>> ★ Music • Playlist • Fun • Birthday • Minecraft",
+      inline=False
+  )
+  embed.add_field(
+      name=f"{_e('zmodule')} __Extra__",
+      value=">>> ★ J2C • Leveling • boost massage • Poll • Counting • Sticky • Joindm • Invite Tracker",
+      inline=False
+  )
+  embed.add_field(
+      name=f"{_e('premium')} __Free Exclusive__",
+      value=">>> `»` • Bot Customization",
+      inline=False
+  )
+  embed.set_footer(text=" ")
+  return embed
+
+
+async def build_help_menu(ctx, mapping=None, page_keyword=None, branding=None):
+  if branding is None:
+    branding = await get_branding(ctx.guild.id)
+  if mapping is None:
+    mapping = {cog: cog.get_commands() for cog in ctx.bot.cogs.values()}
+  home_embed = _build_help_home_embed(branding, ctx.author)
+  view = vhelp.View(
+      mapping=mapping,
+      ctx=ctx,
+      homeembed=home_embed,
+      ui=2,
+      branding=branding,
+  )
+  page = view.find_feature_page(page_keyword) if page_keyword else 0
+  view.set_initial_page(page)
+  return view.embeds[page], view
+
+
 class HelpCommand(commands.HelpCommand):
 
   async def send_ignore_message(self, ctx, ignore_type: str):
@@ -55,6 +127,10 @@ class HelpCommand(commands.HelpCommand):
         await self.send_ignore_message(ctx, "command")
         return
 
+    if vhelp.is_feature_keyword(string):
+        await self.send_feature_help(string)
+        return
+
     cmds = (str(cmd) for cmd in self.context.bot.walk_commands())
     matches = get_close_matches(string, cmds)
 
@@ -87,99 +163,27 @@ class HelpCommand(commands.HelpCommand):
       return
 
     branding = await get_branding(ctx.guild.id)
-    b_name  = branding["branding_name"]
-    b_color = branding["embed_color"]
-
-    # Show loading embed
     loading_embed = discord.Embed(
       description=f"{_e('loadingred')} Loading help Menu... Please wait.",
-      color=b_color
+      color=branding["embed_color"]
     )
     loading_msg = await ctx.reply(embed=loading_embed)
 
-    data = await getConfig(self.context.guild.id)
-    prefix = data["prefix"]
-    filtered = await self.filter_commands(self.context.bot.walk_commands(), sort=True)
+    embed, view = await build_help_menu(ctx, mapping=mapping, branding=branding)
+    await loading_msg.edit(embed=embed, view=view)
 
-
-    embed = discord.Embed(
-        description=(
-            f"```Hey! I'm {b_name}, your own best companion. "
-            "The only bot you need to set up your entire server!```\n"
-            "• Prefix: ``>``, ``sun``\n"
-            "• Total Commands: ``586``\n"
-            "\n"
-            "**✦ EXPLORE BOT FEATURES ✦**"
-        ),
-        color=b_color
+  async def send_feature_help(self, keyword: str):
+    ctx = self.context
+    branding = await get_branding(ctx.guild.id)
+    loading_embed = discord.Embed(
+        description=f"{_e('loadingred')} Loading help Menu... Please wait.",
+        color=branding["embed_color"],
     )
-
-
-    
-    
-    apply_branding_thumbnail(embed, branding, ctx.author)
-    if branding.get("embed_banner"):
-        embed.set_image(url=branding["embed_banner"])
-
-    # Field 1: Security
-    embed.add_field(
-        name=f"{_e('zSafe')} __Security__",
-        value=(
-            ">>> ★ Automod • Antinuke • Verification • Encrypting"
-        ),
-        inline=False
+    loading_msg = await ctx.reply(embed=loading_embed)
+    mapping = {cog: cog.get_commands() for cog in ctx.bot.cogs.values()}
+    embed, view = await build_help_menu(
+        ctx, mapping=mapping, page_keyword=keyword, branding=branding
     )
-
-    # Field 2: Moderation
-    embed.add_field(
-        name=f"{_e('zbot')} __Mkderation__",
-        value=(
-            ">>> ★ Moderation • Ticket | Welcomer • Giveaway • Logging • Voice • Ignoring"
-        ),
-        inline=False
-    )
-
-    # Field 3: Utility
-    embed.add_field(
-        name=f"{_e('zwrench')} __Utility__",
-        value=(
-            ">>> ★ Utility • General • Server • Vanity • Reaction Roles • Giveaway • Boost Massage"
-        ),
-        inline=False
-    )
-
-    # Field 4: Music & Fun
-    embed.add_field(
-        name=f"{_e('starr')} __Music & Fun__",
-        value=(
-            ">>> ★ Music • Playlist • Fun • Birthday • Minecraft"
-        ),
-        inline=False
-    )
-
-    # Field 5: Extra
-    embed.add_field(
-        name=f"{_e('zmodule')} __Extra__",
-        value=(
-            ">>> ★ J2C • Leveling • boost massage • Poll • Counting • Sticky • Joindm • Invite Tracker"
-        ),
-        inline=False
-    )
-    
-    # Field 6: Exclusive
-    embed.add_field(
-        name=f"{_e('premium')} __Free Exclusive__",
-        value=(
-            ">>> `»` • Bot Customization"
-        ),
-        inline=False
-    )
-
-        
-    # Footer
-    embed.set_footer(text=" ")
-    
-    view = vhelp.View(mapping=mapping, ctx=self.context, homeembed=embed, ui=2, branding=branding)
     await loading_msg.edit(embed=embed, view=view)
 
   async def send_command_help(self, command):
@@ -192,6 +196,10 @@ class HelpCommand(commands.HelpCommand):
 
     if not check_ignore:
       await self.send_ignore_message(ctx, "command")
+      return
+
+    if vhelp.is_feature_keyword(command.qualified_name):
+      await self.send_feature_help(command.qualified_name)
       return
 
     zyrox = f">>> {command.help}" if command.help else '>>> No Help Provided...'
@@ -238,6 +246,10 @@ class HelpCommand(commands.HelpCommand):
 
     if not check_ignore:
       await self.send_ignore_message(ctx, "command")
+      return
+
+    if vhelp.is_feature_keyword(group.qualified_name):
+      await self.send_feature_help(group.qualified_name)
       return
 
     entries = [
@@ -340,86 +352,5 @@ class Help(Cog, name="help"):
     bot = interaction.client
     mapping = {cog: cog.get_commands() for cog in bot.cogs.values()}
 
-    data = await getConfig(interaction.guild.id)
-    prefix = data["prefix"]
-    branding = await get_branding(interaction.guild.id)
-    b_name  = branding["branding_name"]
-    b_color = branding["embed_color"]
-
-    
-    embed = discord.Embed(
-        description=(
-            f"```Hey! I'm {b_name}, your own best companion. "
-            "The only bot you need to set up your entire server!```\n"
-            "• Prefix: ``>``, ``sun``\n"
-            "• Total Commands: ``586``\n"
-            "\n"
-            "**✦ EXPLORE BOT FEATURES ✦**"
-        ),
-        color=b_color
-    )
-
-    
-    apply_branding_thumbnail(embed, branding, interaction.user)
-    if branding.get("embed_banner"):
-        embed.set_image(url=branding["embed_banner"])
-
-    # Field 1: Security
-    embed.add_field(
-        name=f"{_e('zSafe')} __Security__",
-        value=(
-            ">>> ★ Automod • Antinuke • Verification • Encrypting"
-        ),
-        inline=False
-    )
-
-    # Field 2: Moderation
-    embed.add_field(
-        name=f"{_e('zbot')} __Mkderation__",
-        value=(
-            ">>> ★ Moderation • Ticket | Welcomer • Giveaway • Logging • Voice • Ignoring"
-        ),
-        inline=False
-    )
-
-    # Field 3: Utility
-    embed.add_field(
-        name=f"{_e('zwrench')} __Utility__",
-        value=(
-            ">>> ★ Utility • General • Server • Vanity • Reaction Roles • Giveaway • Boost Massage"
-        ),
-        inline=False
-    )
-
-    # Field 4: Music & Fun
-    embed.add_field(
-        name=f"{_e('starr')} __Music & Fun__",
-        value=(
-            ">>> ★ Music • Playlist • Fun • Birthday • Minecraft"
-        ),
-        inline=False
-    )
-
-    # Field 5: Extra
-    embed.add_field(
-        name=f"{_e('zmodule')} __Extra__",
-        value=(
-            ">>> ★ J2C • Leveling • boost massage • Poll • Counting • Sticky • Joindm • Invite Tracker"
-        ),
-        inline=False
-    )
-    
-    # Field 6: Exclusive
-    embed.add_field(
-        name=f"{_e('premium')} __Free Exclusive__",
-        value=(
-            ">>> `»` • Bot Customization"
-        ),
-        inline=False
-    )
-    
-    # Footer
-    embed.set_footer(text=" ")
-
-    view = vhelp.View(mapping=mapping, ctx=ctx, homeembed=embed, ui=2, branding=branding)
+    embed, view = await build_help_menu(ctx, mapping=mapping)
     await interaction.followup.send(embed=embed, view=view)

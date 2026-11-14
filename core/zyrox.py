@@ -149,6 +149,24 @@ class zyrox(commands.AutoShardedBot):
     async def invoke_help_command(self, ctx: Context) -> None:
         return await ctx.send_help(ctx.command)
 
+    async def on_message(self, message: discord.Message) -> None:
+        if (
+            message.guild is not None
+            and not message.author.bot
+            and message.content.startswith(">")
+        ):
+            command_text = message.content[1:].strip()
+            if command_text and len(command_text.split()) == 1:
+                from utils import help as help_view
+
+                if help_view.is_feature_keyword(command_text):
+                    ctx: Context = await self.get_context(message, cls=Context)
+                    self.help_command.context = ctx
+                    await self.help_command.command_not_found(command_text)
+                    return
+
+        await self.process_commands(message)
+
     async def fetch_message_by_channel(self, channel: discord.TextChannel, messageID: int) -> typing.Optional[discord.Message]:
         async for msg in channel.history(limit=1, before=discord.Object(messageID + 1), after=discord.Object(messageID - 1)):
             return msg

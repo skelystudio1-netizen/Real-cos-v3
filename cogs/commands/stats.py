@@ -40,6 +40,7 @@ class StatsDropdown(Select):
             discord.SelectOption(label="General Info", emoji=_e("zyrox_global"), description="General Informations About Bot."),
             discord.SelectOption(label="Team Info", emoji=_e("zHuman"), description="Bot creators and team."),
             discord.SelectOption(label="Code Info", emoji=_e("zyrox_search"), description="Stats of bot's source files."),
+            discord.SelectOption(label="Help Menu", emoji=_e("icons_home"), description="Browse all bot features and commands."),
         ]
 
         super().__init__(placeholder="Bot Statistics.", min_values=1, max_values=1, options=options)
@@ -47,6 +48,29 @@ class StatsDropdown(Select):
     async def callback(self, interaction: discord.Interaction):
         if interaction.user != self.ctx.author:
             return await interaction.response.send_message("Only the command invoker can use this menu.", ephemeral=True)
+
+        if self.values[0] == "Help Menu":
+            loading_embed = discord.Embed(
+                description=f"{_e('loadingred')} Loading help Menu... Please wait.",
+                color=0xFF0000,
+            )
+            await interaction.response.edit_message(embed=loading_embed, view=None)
+
+            try:
+                from cogs.commands.help import build_help_menu
+
+                mapping = {cog: cog.get_commands() for cog in self.bot.cogs.values()}
+                embed, view = await build_help_menu(self.ctx, mapping=mapping)
+                await interaction.edit_original_response(embed=embed, view=view)
+            except Exception as error:
+                print(f"Could not load help menu from bot statistics: {error}")
+                error_embed = discord.Embed(
+                    description=f"{_e('zcross')} The help menu could not be loaded. Please try again.",
+                    color=0xFF0000,
+                )
+                await interaction.edit_original_response(embed=error_embed, view=None)
+                raise
+            return
 
         embed = self.embeds[self.values[0]]
         await interaction.response.edit_message(embed=embed)
@@ -132,10 +156,15 @@ class Stats(commands.Cog):
         general_embed.set_footer(text=f"Developed By {DEFAULT_BRANDING}", icon_url=ctx.me.display_avatar.url)
 
         # Team Embed
-        team_embed = Embed(title="Team Stats",
-                           description="`There is only one person Who Made Me, Thanks To Him ❤️.`", color=0xFF0000)
-        team_embed.add_field(name="Main Owner",
-                             value="**[01]. [. Evil ! Rexy .](https://discord.com/users/870179991462236170)**", inline=False)
+        team_embed = Embed(
+            title="Team Stats",
+            description=(
+                "The main owner of the bot is ZENOX but has a contribution of CodeX.\n\n"
+                "The Project by:\n"
+                "[Zen0x .](https://discord.com/users/1249331528329330791)"
+            ),
+            color=0xFF0000,
+        )
         team_embed.set_footer(text=f"Developed By {DEFAULT_BRANDING}", icon_url=ctx.me.display_avatar.url)
         team_embed.set_thumbnail(url=ctx.me.display_avatar.url)
 
